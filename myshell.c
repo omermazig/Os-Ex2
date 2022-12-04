@@ -91,12 +91,17 @@ void process_gt_operation(int count, char** arglist) {
 
 }
 
-void process_normal_operation(int count, char** arglist) {
+int fork_with_error_handling(){
     int pid = fork();
     if(pid < 0) {
         fprintf(stderr, "Fork has failed. Error was: %s\n", strerror(errno));
         exit(1);
     }
+    return pid;
+}
+
+void process_normal_operation(int count, char** arglist) {
+    int pid = fork_with_error_handling();
 
     if(pid == 0) {
 //        Child process
