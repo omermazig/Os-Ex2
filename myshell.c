@@ -144,6 +144,9 @@ int process_arglist(int count, char** arglist){
         process_gt_operation(arglist);
     else
         process_normal_operation(arglist);
+
+//    We always want to keep going
+    return 1;
 }
 
 int finalize(void){
