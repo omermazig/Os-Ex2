@@ -79,8 +79,26 @@ bool is_containing_gt(int count, char** arglist){
         return strcmp(arglist[count - 2], ">") == 0;
 }
 
-void process_background_operation(int count, char** arglist) {
+int fork_with_error_handling(){
+    int pid = fork();
+    if(pid < 0) {
+        fprintf(stderr, "Fork has failed. Error was: %s\n", strerror(errno));
+        exit(1);
+    }
+    return pid;
+}
 
+void process_background_operation(char** arglist) {
+    int pid = fork_with_error_handling();
+
+    if(pid == 0) {
+//        Child process
+        execvp(arglist[0], arglist);
+//        After this we should exit automatically, due to the sigaction we did for SIGCHLD. If didn't, we have a problem
+        fprintf(stderr, "We somehow got after execvp. Error was: %s\n", strerror(errno));
+        exit(1);
+    }
+//    Parent doesn't do anything, because there's no need to wait
 }
 
 void process_pipe_operation(int count, char** arglist) {
@@ -89,15 +107,6 @@ void process_pipe_operation(int count, char** arglist) {
 
 void process_gt_operation(int count, char** arglist) {
 
-}
-
-int fork_with_error_handling(){
-    int pid = fork();
-    if(pid < 0) {
-        fprintf(stderr, "Fork has failed. Error was: %s\n", strerror(errno));
-        exit(1);
-    }
-    return pid;
 }
 
 void process_normal_operation(int count, char** arglist) {
@@ -121,8 +130,11 @@ void process_normal_operation(int count, char** arglist) {
 // it contains count+1 items, where the last item (arglist[count]) and *only* the last is NULL
 // RETURNS - 1 if should continue, 0 otherwise
 int process_arglist(int count, char** arglist){
-    if(is_containing_ampersand(count, arglist))
-        process_background_operation(count - 1, arglist);
+    if(is_containing_ampersand(count, arglist)){
+//        Last character is ampersand, and it is not needed, so we'll change it to NULL so it ends the array
+        arglist[count-1] = NULL;
+        process_background_operation(arglist);
+    }
     else if(is_containing_pipe(count, arglist))
         process_pipe_operation(count, arglist);
     else if(is_containing_gt(count, arglist))
