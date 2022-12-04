@@ -5,6 +5,7 @@
 #include <wait.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 
 void set_sig_int_ignorance(){
@@ -13,6 +14,17 @@ void set_sig_int_ignorance(){
     ignore_sig_int.sa_handler = SIG_IGN;
     ignore_sig_int.sa_flags = SA_RESTART;
     if(sigaction(SIGINT, &ignore_sig_int, 0) < 0){
+        fprintf(stderr, "Couldn't set signal for SIG_IGN. Error was: %s\n", strerror(errno));
+        exit(1);
+    }
+}
+
+void set_sig_int_to_default(){
+    struct sigaction default_sig_int;
+    memset(&default_sig_int, 0, sizeof(default_sig_int));
+    default_sig_int.sa_handler = SIG_DFL;
+    default_sig_int.sa_flags = SA_RESTART;
+    if(sigaction(SIGINT, &default_sig_int, 0) < 0){
         fprintf(stderr, "Couldn't set signal for SIG_IGN. Error was: %s\n", strerror(errno));
         exit(1);
     }
@@ -80,7 +92,24 @@ void process_gt_operation(int count, char** arglist) {
 }
 
 void process_normal_operation(int count, char** arglist) {
+    int pid = fork();
+    if(pid < 0) {
+        fprintf(stderr, "Fork has failed. Error was: %s\n", strerror(errno));
+        exit(1);
+    }
 
+    if(pid == 0) {
+//        Child process
+        set_sig_int_to_default();
+        execvp(arglist[0], arglist);
+//        After this we should exit automatically, due to the sigaction we did for SIGCHLD. If didn't, we have a problem
+        fprintf(stderr, "We somehow got after execvp. Error was: %s\n", strerror(errno));
+        exit(1);
+    }
+    else {
+//        Parent process - Waits for child process to exit
+        waitpid(pid, NULL, WUNTRACED);
+    }
 }
 
 // arglist - a list of char* arguments (words) provided by the user
