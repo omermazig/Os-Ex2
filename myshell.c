@@ -96,7 +96,7 @@ void process_background_operation(char** arglist) {
 //        Child process
         execvp(arglist[0], arglist);
 //        After this we should exit automatically, due to the sigaction we did for SIGCHLD. If didn't, we have a problem
-        fprintf(stderr, "We somehow got after execvp. Error was: %s\n", strerror(errno));
+        fprintf(stderr, "%s Command didn't work. Error was: %s\n", arglist[0], strerror(errno));
         exit(1);
     }
 //    Parent doesn't do anything, because there's no need to wait
@@ -114,7 +114,7 @@ void process_normal_operation(char** arglist) {
         set_sig_int_to_default();
         execvp(arglist[0], arglist);
 //        After this we should exit automatically, due to the sigaction we did for SIGCHLD. If didn't, we have a problem
-        fprintf(stderr, "We somehow got after execvp. Error was: %s\n", strerror(errno));
+        fprintf(stderr, "%s Command didn't work. Error was: %s\n", arglist[0], strerror(errno));
         exit(1);
     }
     else {
