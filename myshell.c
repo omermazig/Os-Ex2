@@ -89,21 +89,71 @@ int fork_with_error_handling(){
     return pid;
 }
 
+void do_normal_operation(char** arglist){
+    execvp(arglist[0], arglist);
+//        After this we should exit automatically, due to the sigaction we did for SIGCHLD. If didn't, we have a problem
+    fprintf(stderr, "%s Command didn't work. Error was: %s\n", arglist[0], strerror(errno));
+    exit(1);
+}
+
 void process_background_operation(char** arglist) {
     int pid = fork_with_error_handling();
 
     if(pid == 0) {
 //        Child process
-        execvp(arglist[0], arglist);
-//        After this we should exit automatically, due to the sigaction we did for SIGCHLD. If didn't, we have a problem
-        fprintf(stderr, "%s Command didn't work. Error was: %s\n", arglist[0], strerror(errno));
-        exit(1);
+        do_normal_operation(arglist);
     }
 //    Parent doesn't do anything, because there's no need to wait
 }
 
-void process_pipe_operation(int count, char** arglist) {
+void process_pipe_operation(char** arglist) {
+    char** firstArgList = arglist;
+    //    Increase pointer until we reach | sign
+    while(strcmp(*(++arglist), "|") != 0);
+    //    Put NULL instead of |, to split the array into 2 arrays.
+    *arglist = NULL;
+    char** secondArgList = ++arglist;
 
+    int pipe_fd[2];
+
+    if (pipe(pipe_fd) < 0) {
+        fprintf(stderr, "Couldn't open pipe. Error was: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    int pid1 = fork_with_error_handling();
+
+    if(pid1 == 0){
+//        First command process
+        set_sig_int_to_default();
+        if(dup2(pipe_fd[1], STDOUT_FILENO) == -1){
+            fprintf(stderr, "dup2 didn't work. Error was: %s\n", strerror(errno));
+            exit(1);
+        }
+        close(pipe_fd[0]);
+        close(pipe_fd[1]);
+        do_normal_operation(firstArgList);
+    }
+    else {
+//        Parent process - Needs to run the second command
+        close(pipe_fd[1]);
+        int pid2 = fork_with_error_handling();
+        if(pid2 == 0){
+//            Second command process
+            set_sig_int_to_default();
+            if(dup2(pipe_fd[0], STDIN_FILENO) == -1){
+                fprintf(stderr, "dup2 didn't work. Error was: %s\n", strerror(errno));
+                exit(1);
+            }
+            close(pipe_fd[0]);
+            do_normal_operation(secondArgList);
+        }
+        else {
+//            Parent process - Ran both command and now needs to wait for them.
+            waitpid(pid1, NULL, WUNTRACED);
+            waitpid(pid2, NULL, WUNTRACED);
+        }
+    }
 }
 
 void process_normal_operation(char** arglist) {
@@ -112,10 +162,7 @@ void process_normal_operation(char** arglist) {
     if(pid == 0) {
 //        Child process
         set_sig_int_to_default();
-        execvp(arglist[0], arglist);
-//        After this we should exit automatically, due to the sigaction we did for SIGCHLD. If didn't, we have a problem
-        fprintf(stderr, "%s Command didn't work. Error was: %s\n", arglist[0], strerror(errno));
-        exit(1);
+        do_normal_operation(arglist);
     }
     else {
 //        Parent process - Waits for child process to exit
@@ -123,8 +170,23 @@ void process_normal_operation(char** arglist) {
     }
 }
 
-void process_gt_operation(char **arglist) {
+void process_gt_operation(char** arglist) {
+    char** originalArgListPointer = arglist;
+    //    Increase pointer until we reach | sign
+    while(strcmp(*(++arglist), ">") != 0);
+    //    Put NULL instead of > and the file name, to transform it into a regular command
+    *arglist = NULL;
+    char* filename = *(++arglist);
+    *arglist = NULL;
 
+    int file_desc = open(filename, O_CREAT | O_WRONLY | O_TRUNC, 0600);
+    if(file_desc < 0) {
+        fprintf(stderr, "Can't open output file. Error was: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    dup2(file_desc, STDOUT_FILENO);
+    process_normal_operation(originalArgListPointer);
 }
 
 
@@ -139,7 +201,7 @@ int process_arglist(int count, char** arglist){
         process_background_operation(arglist);
     }
     else if(is_containing_pipe(count, arglist))
-        process_pipe_operation(count, arglist);
+        process_pipe_operation(arglist);
     else if(is_containing_gt(count, arglist))
         process_gt_operation(arglist);
     else
