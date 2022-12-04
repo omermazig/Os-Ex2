@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 
 void set_sig_int_ignorance(){
@@ -105,11 +106,7 @@ void process_pipe_operation(int count, char** arglist) {
 
 }
 
-void process_gt_operation(int count, char** arglist) {
-
-}
-
-void process_normal_operation(int count, char** arglist) {
+void process_normal_operation(char** arglist) {
     int pid = fork_with_error_handling();
 
     if(pid == 0) {
@@ -126,6 +123,12 @@ void process_normal_operation(int count, char** arglist) {
     }
 }
 
+void process_gt_operation(char **arglist) {
+
+}
+
+
+
 // arglist - a list of char* arguments (words) provided by the user
 // it contains count+1 items, where the last item (arglist[count]) and *only* the last is NULL
 // RETURNS - 1 if should continue, 0 otherwise
@@ -138,9 +141,9 @@ int process_arglist(int count, char** arglist){
     else if(is_containing_pipe(count, arglist))
         process_pipe_operation(count, arglist);
     else if(is_containing_gt(count, arglist))
-        process_gt_operation(count, arglist);
+        process_gt_operation(arglist);
     else
-        process_normal_operation(count, arglist);
+        process_normal_operation(arglist);
 }
 
 int finalize(void){
