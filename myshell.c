@@ -185,8 +185,14 @@ void process_gt_operation(char** arglist) {
         exit(1);
     }
 
+//    Now we'll change the file_desc to get the number of the STDOUT, and that way it will receive to output of the
+//    normal command. We'll save the original STDOUT fd in a variable, and revert this dup2 after we're done.
+    int original_stdout_fd = dup(STDOUT_FILENO);
     dup2(file_desc, STDOUT_FILENO);
+    close(file_desc);
     process_normal_operation(originalArgListPointer);
+    dup2(original_stdout_fd, STDOUT_FILENO);
+    close(original_stdout_fd);
 }
 
 
