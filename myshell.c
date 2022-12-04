@@ -58,6 +58,7 @@ void set_sig_chld_behavior() {
 int prepare(void) {
     set_sig_int_ignorance();
     set_sig_chld_behavior();
+    return 0;
 }
 
 bool is_containing_ampersand(int count, char **arglist) {
